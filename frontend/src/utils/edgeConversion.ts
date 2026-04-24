@@ -36,12 +36,12 @@ export function edgesToColumnGroups(
     const sNode = nodeMap.get(edge.source);
     const sSchema = (sNode?.data?.schema as string) || "";
     const sTable = sNode ? (sNode.data.label as string) : edge.source.includes(".") ? edge.source.split(".").pop()! : edge.source;
-    const sCatalog = defaultCatalog || "";
+    const sCatalog = (sNode?.data?.catalog as string) || defaultCatalog || "";
 
     const tNode = nodeMap.get(edge.target);
     const tSchema = (tNode?.data?.schema as string) || "";
     const tTable = tNode ? (tNode.data.label as string) : edge.target.includes(".") ? edge.target.split(".").pop()! : edge.target;
-    const tCatalog = defaultCatalog || "";
+    const tCatalog = (tNode?.data?.catalog as string) || defaultCatalog || "";
 
     const relations = (edge.data?.relations as any[]) || [];
 

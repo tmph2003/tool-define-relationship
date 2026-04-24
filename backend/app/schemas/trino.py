@@ -35,6 +35,7 @@ class HealthResponse(BaseModel):
     host: str | None = None
     catalog: str | None = None
     schema_name: str | None = None
+    user: str | None = None
 
 
 class TrinoConnectionResponse(BaseModel):

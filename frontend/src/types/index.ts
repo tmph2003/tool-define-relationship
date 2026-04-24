@@ -89,6 +89,7 @@ export interface MetadataState {
   connectionError: string | null;
   catalog: string | null;
   connectedHost: string | null;
+  connectedUser: string | null;
   primarySchema: string | null;
   schemas: SchemaNode[];
   schemasLoading: boolean;

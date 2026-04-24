@@ -43,18 +43,19 @@ function typeAbbr(dt: string): string {
 interface TableRowProps {
   table: TableNode;
   schema: string;
+  catalog: string;
   expanded: boolean;
   onToggle: (schema: string, table: string) => void;
 }
 
-export function TableRow({ table, schema, expanded, onToggle }: TableRowProps) {
+export function TableRow({ table, schema, catalog, expanded, onToggle }: TableRowProps) {
   const hasColumns = table.columns !== null;
   const isExpanded = expanded && hasColumns;
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData(
       "application/rd-table",
-      JSON.stringify({ schema, table: table.table_name, type: table.table_type })
+      JSON.stringify({ catalog, schema, table: table.table_name, type: table.table_type })
     );
     e.dataTransfer.effectAllowed = "copy";
 
@@ -240,6 +241,7 @@ interface SchemaRowProps {
   onToggleTable: (schema: string, table: string) => void;
   expandedTables: Set<string>;
   onToggleTableExpand: (key: string) => void;
+  catalog: string;
 }
 
 export function SchemaRow({
@@ -249,6 +251,7 @@ export function SchemaRow({
   onToggleTable,
   expandedTables,
   onToggleTableExpand,
+  catalog,
 }: SchemaRowProps) {
   const filteredTables = (schema.tables ?? []).filter((t) =>
     !filter || t.table_name.toLowerCase().includes(filter.toLowerCase())
@@ -379,6 +382,7 @@ export function SchemaRow({
                 key={table.table_name}
                 table={table}
                 schema={schema.schema_name}
+                catalog={catalog}
                 expanded={tableExpanded}
                 onToggle={(s, t) => {
                   onToggleTableExpand(`${s}.${t}`);

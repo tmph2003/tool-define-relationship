@@ -21,6 +21,15 @@ async def lifespan(app: FastAPI):
     # Create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Safely add the version column for OCC if it doesn't exist
+        from sqlalchemy import text
+        from sqlalchemy.exc import ProgrammingError
+        try:
+            await conn.execute(text("ALTER TABLE projects ADD COLUMN version INTEGER NOT NULL DEFAULT 1"))
+        except ProgrammingError:
+            # Column already exists
+            pass
     yield
     # Cleanup on shutdown
 

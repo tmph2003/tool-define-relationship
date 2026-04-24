@@ -8,9 +8,10 @@ export const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
   dagreGraph.setGraph({ rankdir: direction });
 
   nodes.forEach((node) => {
-    // For tables, width is typically ~220px but height depends on rows. We estimate.
-    const width = node.measured?.width ?? 220;
-    const height = node.measured?.height ?? ((node.data?.columns as any[])?.length || 10) * 24 + 50;
+    // Prefer explicitly set style dimensions over fallback defaults.
+    // If measured width/height is available, use it, otherwise fall back to style.width/height, then defaults.
+    const width = node.measured?.width ?? (node.style?.width as number) ?? 220;
+    const height = node.measured?.height ?? (node.style?.height as number) ?? ((node.data?.columns as any[])?.length || 10) * 24 + 50;
     dagreGraph.setNode(node.id, { width, height });
   });
 

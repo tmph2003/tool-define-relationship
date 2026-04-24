@@ -9,6 +9,8 @@ import KeyGroupManager from "./components/KeyGroupManager";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
+import GlobalLoader from "./components/GlobalLoader";
+
 export default function App() {
   return (
     // Force dark mode at root — Obsidian Cartographer design
@@ -18,6 +20,7 @@ export default function App() {
           <ReactFlowProvider>
             <MetadataProvider>
               <ProjectProvider>
+                <GlobalLoader />
                 <TopNavbar />
                 <LeftSidebar />
                 <CenterCanvas />

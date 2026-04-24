@@ -114,7 +114,7 @@ function ColumnEndpoint({ tableId, column, onChange }: { tableId: string; column
 export default function RightPropertiesPanel() {
   const { setEdges, setNodes, getEdges, getNode } = useReactFlow();
   const edges = useEdges();
-  const { captureHistory, selectedEdgeId, setSelectedEdgeId, selectedNodeId, setSelectedNodeId, activeTab } = useProject();
+  const { captureHistory, selectedEdgeId, setSelectedEdgeId, selectedNodeId, setSelectedNodeId, activeTab, setIsDirty } = useProject();
 
   if (activeTab === "Relations") return null;
 
@@ -127,6 +127,7 @@ export default function RightPropertiesPanel() {
     setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
     setEdges((eds) => eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id));
     setSelectedNodeId(null);
+    setIsDirty(true);
   };
 
   const updateEdgeData = (key: keyof EdgeData, value: any) => {
@@ -142,6 +143,7 @@ export default function RightPropertiesPanel() {
           : e
       )
     );
+    setIsDirty(true);
   };
 
   if (!selectedEdge && !selectedNode) {
@@ -430,8 +432,10 @@ export default function RightPropertiesPanel() {
                     const newRels = [...(data.relations as any[])];
                     newRels.splice(idx, 1);
                     if (newRels.length === 0) {
+                      captureHistory();
                       setEdges((eds) => eds.filter((e) => e.id !== selectedEdge.id));
                       setSelectedEdgeId(null);
+                      setIsDirty(true);
                     } else {
                       updateEdgeData("relations", newRels);
                     }
@@ -486,6 +490,7 @@ export default function RightPropertiesPanel() {
             captureHistory();
             setEdges((eds) => eds.filter((e) => e.id !== selectedEdge.id));
             setSelectedEdgeId(null);
+            setIsDirty(true);
           }}
           className="flex-1 py-1.5 rounded-sm text-xs font-medium transition-all duration-100"
           style={{

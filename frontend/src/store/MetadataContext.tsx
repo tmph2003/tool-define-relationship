@@ -7,6 +7,7 @@ const initial: MetadataState = {
   connectionError: null,
   catalog: null,
   connectedHost: null,
+  connectedUser: null,
   primarySchema: null,
   schemas: [],
   schemasLoading: false,
@@ -38,6 +39,7 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
             connectionStatus: "connected",
             schemasLoading: schemaName ? true : false,
             connectedHost: res.host || s.connectedHost,
+            connectedUser: (res as any).user || s.connectedUser,
             catalog: res.catalog || s.catalog,
             primarySchema: schemaName || s.primarySchema,
           }));
@@ -88,6 +90,7 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
         connectionStatus: "connected",
         catalog: res.catalog,
         connectedHost: res.host,
+        connectedUser: res.user,
         primarySchema: res.schema_name || null,
         schemasLoading: false,
         schemasError: null,

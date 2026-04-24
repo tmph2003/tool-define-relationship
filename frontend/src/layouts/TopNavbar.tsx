@@ -3,6 +3,8 @@ import TrinoConnectForm from "../components/TrinoConnectForm";
 import { useProject } from "../store/ProjectContext";
 import { useMetadata } from "../store/MetadataContext";
 import yaml from "yaml";
+import { useToast } from "../contexts/ToastContext";
+import HistoryModal from "../components/HistoryModal";
 
 const NAV_LINKS = ["Graph", "Relations"];
 
@@ -21,8 +23,21 @@ export default function TopNavbar() {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { toast } = useToast();
   
-  const { exportProject, loadProject, activeTab, setActiveTab } = useProject();
+  const { exportProject, loadProject, activeTab, setActiveTab, isDirty, saveProjectToServer } = useProject();
+
+  const handleSaveToServer = async () => {
+    if (!metadataState.connectedUser) return;
+    const storageKey = `rd_graph_user_${metadataState.connectedUser}`;
+    try {
+      await saveProjectToServer(storageKey);
+      toast({ type: "success", message: "Saved successfully!" });
+    } catch (err: any) {
+      toast({ type: "error", message: err.message || "Failed to save." });
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -141,7 +156,47 @@ export default function TopNavbar() {
         </nav>
 
         {/* Right controls */}
-        <div className="flex items-center justify-end gap-3 shrink-0 relative" style={{ width: "var(--panel-w)" }} ref={menuRef}>
+        <div className="flex items-center justify-end gap-3 shrink-0 relative" style={{ width: "300px" }} ref={menuRef}>
+          
+          {/* Save Button */}
+          <button
+            onClick={handleSaveToServer}
+            disabled={!isDirty || metadataState.connectionStatus !== "connected"}
+            title={!isDirty ? "No unsaved changes" : "Save changes to server"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-medium transition-all duration-150"
+            style={{
+              background: isDirty ? "var(--color-amber)" : "rgba(255,255,255,0.05)",
+              color: isDirty ? "var(--color-bg)" : "var(--color-text-3)",
+              cursor: isDirty ? "pointer" : "not-allowed",
+              fontFamily: "Space Grotesk, sans-serif",
+              border: "none",
+              opacity: isDirty ? 1 : 0.6,
+            }}
+          >
+            {isDirty && (
+              <span className="inline-block rounded-full shrink-0" style={{ width: 6, height: 6, background: "var(--color-bg)", animation: "pulse 2s infinite" }} />
+            )}
+            Save
+          </button>
+
+          {/* History Button */}
+          <button
+            onClick={() => setHistoryOpen(true)}
+            disabled={metadataState.connectionStatus !== "connected"}
+            title="View project history"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-medium transition-all duration-150 hover:bg-white/10"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              color: "var(--color-text-2)",
+              cursor: metadataState.connectionStatus === "connected" ? "pointer" : "not-allowed",
+              fontFamily: "Space Grotesk, sans-serif",
+              border: "none",
+              opacity: metadataState.connectionStatus === "connected" ? 1 : 0.6,
+            }}
+          >
+            History
+          </button>
+
           {/* Connection status pill */}
           <button
             id="trino-connect-btn"
@@ -240,21 +295,6 @@ export default function TopNavbar() {
               </div>
             )}
           </div>
-
-          {/* Avatar */}
-          <div
-            className="flex items-center justify-center rounded-full text-xs font-bold shrink-0"
-            style={{
-              width: 28,
-              height: 28,
-              background: "var(--color-surface-2)",
-              border: "1px solid var(--color-border-mid)",
-              color: "var(--color-text-2)",
-              fontFamily: "JetBrains Mono, monospace",
-            }}
-          >
-            U
-          </div>
         </div>
       </header>
 
@@ -262,6 +302,12 @@ export default function TopNavbar() {
       <TrinoConnectForm
         open={formOpen}
         onClose={() => setFormOpen(false)}
+      />
+
+      {/* History Modal */}
+      <HistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
       />
 
       {/* Pulse animation for disconnected dot */}

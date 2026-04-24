@@ -181,10 +181,10 @@ def is_reachable() -> bool:
 
 
 def get_connection_info() -> dict[str, str | None]:
-    """Return current connection host, catalog, and schema."""
+    """Return current connection host, catalog, schema, and user."""
     if not _params.connected:
-        return {"host": None, "catalog": None, "schema_name": None}
-    return {"host": _params.host, "catalog": _params.catalog, "schema_name": _params.schema_name}
+        return {"host": None, "catalog": None, "schema_name": None, "user": None}
+    return {"host": _params.host, "catalog": _params.catalog, "schema_name": _params.schema_name, "user": _params.user}
 
 
 def get_schemas() -> SchemasResponse:

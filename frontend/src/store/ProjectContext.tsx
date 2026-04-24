@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useReactFlow, type Edge, type Node } from "@xyflow/react";
 import type { ProjectData, ProjectSettings, KeyGroup } from "../types";
 import { edgesToColumnGroups, columnGroupsToEdges, type ColumnEndpoint } from "../utils/edgeConversion";
+import { saveProjectState } from "../api/projects";
 
 interface ProjectContextType {
   keyGroups: KeyGroup[];
@@ -23,6 +24,15 @@ interface ProjectContextType {
   setSelectedEdgeId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedNodeId: string | null;
   setSelectedNodeId: React.Dispatch<React.SetStateAction<string | null>>;
+  isDirty: boolean;
+  setIsDirty: React.Dispatch<React.SetStateAction<boolean>>;
+  serverVersion: number | undefined;
+  setServerVersion: React.Dispatch<React.SetStateAction<number | undefined>>;
+  saveProjectToServer: (connectionKey: string) => Promise<void>;
+  isProjectLoading: boolean;
+  setIsProjectLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  isHistoryLoading: boolean;
+  setIsHistoryLoading: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
@@ -37,6 +47,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState("Graph");
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [serverVersion, setServerVersion] = useState<number | undefined>(undefined);
+  const [isProjectLoading, setIsProjectLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   const captureHistory = useCallback(() => {
     const nodes = getNodes();
@@ -60,10 +74,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setNodes(prevState.nodes);
       setEdges(prevState.edges);
       success = true;
-      return h.slice(0, -1);
+      const newHistory = h.slice(0, -1);
+      // If we've undone everything, we're back to the saved state
+      if (newHistory.length === 0) {
+        setIsDirty(false);
+      }
+      return newHistory;
     });
     return success;
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, setIsDirty]);
 
   const getColumnGroups = (): ColumnEndpoint[][] => {
     return edgesToColumnGroups(getEdges(), getNodes());
@@ -98,6 +117,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (data.settings) setSettings(data.settings);
   };
 
+  const saveProjectToServer = async (connectionKey: string) => {
+    // Use statically imported API method
+    
+    const columnGroups = edgesToColumnGroups(getEdges(), getNodes());
+    const newVersion = await saveProjectState(connectionKey, {
+      nodes: getNodes(),
+      column_groups: columnGroups,
+      version: serverVersion,
+    });
+    
+    if (newVersion !== undefined) {
+      setServerVersion(newVersion);
+      setIsDirty(false);
+    }
+  };
+
   return (
     <ProjectContext.Provider
       value={{
@@ -118,6 +153,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setSelectedEdgeId,
         selectedNodeId,
         setSelectedNodeId,
+        isDirty,
+        setIsDirty,
+        serverVersion,
+        setServerVersion,
+        saveProjectToServer,
+        isProjectLoading,
+        setIsProjectLoading,
+        isHistoryLoading,
+        setIsHistoryLoading,
       }}
     >
       {children}

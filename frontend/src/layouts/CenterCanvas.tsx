@@ -19,12 +19,15 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStoreApi,
   ConnectionMode,
   ConnectionLineType,
   type Connection,
   type Edge,
   type Node,
   type EdgeMouseHandler,
+  type NodeChange,
+  type EdgeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -35,10 +38,10 @@ import { useToast } from "../contexts/ToastContext";
 import { getLayoutedElements } from "../utils/layout";
 import { useMetadata } from "../store/MetadataContext";
 import { useProject } from "../store/ProjectContext";
-import { fetchProjectState, saveProjectState } from "../api/projects";
+import { fetchProjectState } from "../api/projects";
 import RelationsView from "./RelationsView";
 import { fetchColumns } from "../services";
-import { edgesToColumnGroups, columnGroupsToEdges } from "../utils/edgeConversion";
+import { columnGroupsToEdges } from "../utils/edgeConversion";
 
 // ─── Node & Edge type registry ───────────────────────────────────────────────
 
@@ -67,10 +70,47 @@ export default function CenterCanvas() {
   const { toast } = useToast();
   const { state: metadataState, toggleTable } = useMetadata();
   const { screenToFlowPosition, fitView } = useReactFlow();
-  const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_NODES);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_EDGES);
+  const store = useStoreApi();
+  const [nodes, setNodes, onNodesChangeCore] = useNodesState(INITIAL_NODES);
+  const [edges, setEdges, onEdgesChangeCore] = useEdgesState(INITIAL_EDGES);
 
-  const { captureHistory, undoHistory, activeTab, setSelectedEdgeId, setSelectedNodeId } = useProject();
+  const { captureHistory, undoHistory, activeTab, setSelectedEdgeId, setSelectedNodeId, setIsDirty, setServerVersion, setIsProjectLoading } = useProject();
+
+  // Cancel connection on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        store.getState().cancelConnection();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [store]);
+
+  // Guard to prevent save from overwriting data while load is in progress
+  const isLoadingRef = useRef(false);
+  // Guard to prevent undo from re-triggering isDirty via onNodesChange/onEdgesChange
+  const isUndoingRef = useRef(false);
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChangeCore(changes);
+    if (!isLoadingRef.current && !isUndoingRef.current) {
+      if (changes.some(c => c.type === 'remove' || c.type === 'add')) {
+        console.log("isDirty triggered by onNodesChange:", changes.filter(c => c.type === 'remove' || c.type === 'add'));
+        setIsDirty(true);
+      }
+    }
+  }, [onNodesChangeCore, setIsDirty]);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChangeCore(changes);
+    if (!isLoadingRef.current && !isUndoingRef.current) {
+      if (changes.some(c => c.type === 'remove' || c.type === 'add')) {
+        console.log("isDirty triggered by onEdgesChange:", changes.filter(c => c.type === 'remove' || c.type === 'add'));
+        setIsDirty(true);
+      }
+    }
+  }, [onEdgesChangeCore, setIsDirty]);
 
   // Force pointer-events on the edges containers — React Flow v12 sets
   // pointer-events:none on multiple layers which blocks edge click events.
@@ -115,11 +155,14 @@ export default function CenterCanvas() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return;
       }
-      
+
       // Undo (Ctrl+Z)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
+        isUndoingRef.current = true;
         const success = undoHistory();
+        // Clear the flag after React Flow processes the state changes
+        setTimeout(() => { isUndoingRef.current = false; }, 200);
         if (success) {
           toast({ type: "success", message: "Undo successful" });
         } else {
@@ -132,10 +175,10 @@ export default function CenterCanvas() {
       if (e.key === 'Delete') {
         const selectedNodes = nodes.filter(n => n.selected);
         const selectedEdges = edges.filter(e => e.selected);
-        
+
         if (selectedNodes.length > 0 || selectedEdges.length > 0) {
           captureHistory();
-          
+
           if (selectedNodes.length > 0) {
             const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
             setNodes(nds => nds.filter(n => !selectedNodeIds.has(n.id)));
@@ -145,6 +188,8 @@ export default function CenterCanvas() {
             const selectedEdgeIds = new Set(selectedEdges.map(e => e.id));
             setEdges(eds => eds.filter(e => !selectedEdgeIds.has(e.id)));
           }
+          console.log("isDirty triggered by manual delete");
+          setIsDirty(true);
         }
       }
     };
@@ -153,29 +198,36 @@ export default function CenterCanvas() {
   }, [nodes, edges, setNodes, setEdges, toast, captureHistory, undoHistory]);
 
   const storageKey = useMemo(() => {
-    if (metadataState.connectedHost && metadataState.catalog) {
-      return `rd_graph_${metadataState.connectedHost}_${metadataState.catalog}_${metadataState.primarySchema || "all"}`;
+    if (metadataState.connectedUser) {
+      return `rd_graph_user_${metadataState.connectedUser}`;
     }
     return null;
-  }, [metadataState.connectedHost, metadataState.catalog, metadataState.primarySchema]);
-
-  // Guard to prevent save from overwriting data while load is in progress
-  const isLoadingRef = useRef(false);
+  }, [metadataState.connectedUser]);
 
   // Load from backend on connection
   useEffect(() => {
     let mounted = true;
     if (metadataState.connectionStatus === "connected" && storageKey) {
       isLoadingRef.current = true;
+      setIsProjectLoading(true);
       fetchProjectState(storageKey).then(saved => {
         if (!mounted || !saved) {
           isLoadingRef.current = false;
+          setIsProjectLoading(false);
           return;
         }
         const { nodes: savedNodes, column_groups: savedGroups } = saved;
 
         // Restore nodes
-        if (savedNodes && savedNodes.length > 0) setNodes(savedNodes);
+        if (savedNodes && savedNodes.length > 0) {
+          setNodes(savedNodes.map(node => {
+            // Backfill catalog for legacy nodes that were saved before catalog support
+            if (node.data && !node.data.catalog && metadataState.catalog) {
+              node.data.catalog = metadataState.catalog;
+            }
+            return node;
+          }));
+        }
 
         // Restore edges from column_groups
         if (savedGroups && savedGroups.length > 0 && savedNodes) {
@@ -183,24 +235,22 @@ export default function CenterCanvas() {
           setEdges(restoredEdges);
         }
 
-        // Allow saves after load is complete
-        isLoadingRef.current = false;
+        if (saved.version !== undefined) {
+          setServerVersion(saved.version);
+        }
+        setIsDirty(false);
+
+        // Allow saves after load is complete (small timeout to let state flush)
+        setTimeout(() => {
+          if (mounted) {
+            isLoadingRef.current = false;
+            setIsProjectLoading(false);
+          }
+        }, 100);
       });
     }
     return () => { mounted = false; };
-  }, [metadataState.connectionStatus, storageKey, setNodes, setEdges]);
-
-  // Save to backend on change — uses portable column_groups format
-  useEffect(() => {
-    // Skip saving while load is in progress (prevents race condition)
-    if (isLoadingRef.current) return;
-    if (metadataState.connectionStatus === "connected" && storageKey) {
-      if (nodes.length > 0 || edges.length > 0) {
-        const columnGroups = edgesToColumnGroups(edges, nodes, metadataState.catalog || undefined);
-        saveProjectState(storageKey, { nodes, column_groups: columnGroups });
-      }
-    }
-  }, [nodes, edges, metadataState.connectionStatus, storageKey]);
+  }, [metadataState.connectionStatus, storageKey, setNodes, setEdges, setIsProjectLoading]);
 
   // Auto-fetch missing columns for ANY node on the canvas that is in loading state
   const fetchingNodesRef = useRef<Set<string>>(new Set());
@@ -225,13 +275,6 @@ export default function CenterCanvas() {
                   const newCols = res.columns.map((c) => ({
                     name: c.column_name,
                     type: c.data_type,
-                    isPk:
-                      c.column_name.toLowerCase() === "id" ||
-                      c.column_name.toLowerCase() === `${tableName.toLowerCase()}_id`,
-                    isFk:
-                      c.column_name.toLowerCase().endsWith("_id") &&
-                      c.column_name.toLowerCase() !== "id" &&
-                      c.column_name.toLowerCase() !== `${tableName.toLowerCase()}_id`,
                   }));
                   return {
                     ...node,
@@ -266,16 +309,9 @@ export default function CenterCanvas() {
           if (table && table.columns && table.columns.length > 0) {
             changed = true;
             const newCols = table.columns.map((c) => ({
-                  name: c.column_name,
-                  type: c.data_type,
-                  isPk:
-                    c.column_name.toLowerCase() === "id" ||
-                    c.column_name.toLowerCase() === `${table.table_name.toLowerCase()}_id`,
-                  isFk:
-                    c.column_name.toLowerCase().endsWith("_id") &&
-                    c.column_name.toLowerCase() !== "id" &&
-                    c.column_name.toLowerCase() !== `${table.table_name.toLowerCase()}_id`,
-                }));
+              name: c.column_name,
+              type: c.data_type,
+            }));
             return {
               ...n,
               style: { ...n.style, height: calcNodeHeight(newCols.length) },
@@ -293,6 +329,53 @@ export default function CenterCanvas() {
     });
   }, [metadataState.schemas, setNodes]);
 
+  // Validate edges: remove relations that refer to non-existent columns (e.g. after DB refresh)
+  useEffect(() => {
+    if (nodes.length === 0 || edges.length === 0) return;
+
+    setEdges((eds) => {
+      let changed = false;
+      const nextEdges = eds.map(edge => {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const targetNode = nodes.find(n => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) return edge;
+        // Skip validation if nodes are still loading columns
+        if ((sourceNode.data as any).loading || (targetNode.data as any).loading) return edge;
+
+        const sourceCols = new Set(((sourceNode.data as any).columns || []).map((c: any) => c.name));
+        const targetCols = new Set(((targetNode.data as any).columns || []).map((c: any) => c.name));
+
+        const relations = (edge.data?.relations as any[]) || [];
+        const validRelations = relations.filter(r => sourceCols.has(r.sourceCol) && targetCols.has(r.targetCol));
+
+        if (validRelations.length !== relations.length) {
+          changed = true;
+          return {
+            ...edge,
+            data: { ...edge.data, relations: validRelations }
+          };
+        }
+        return edge;
+      }).filter(edge => {
+        const rels = edge.data?.relations as any[] | undefined;
+        // If an edge was modified and now has 0 relations, remove the entire edge
+        if (rels && rels.length === 0) {
+          changed = true;
+          return false;
+        }
+        return true;
+      });
+
+      if (changed) {
+        console.log("isDirty triggered by edge validation (relations length mismatch or 0)");
+        setIsDirty(true);
+        return nextEdges;
+      }
+      return eds;
+    });
+  }, [nodes, setEdges, setIsDirty]);
+
   // When a user draws a new edge between column handles
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -307,12 +390,12 @@ export default function CenterCanvas() {
 
       const existingEdge = edges.find(
         (e) => (e.source === connection.source && e.target === connection.target) ||
-               (e.source === connection.target && e.target === connection.source)
+          (e.source === connection.target && e.target === connection.source)
       );
 
       if (existingEdge) {
         const isReversed = existingEdge.source === connection.target;
-        const newRelation = isReversed 
+        const newRelation = isReversed
           ? { sourceCol: targetCol, targetCol: sourceCol }
           : { sourceCol, targetCol };
 
@@ -329,6 +412,8 @@ export default function CenterCanvas() {
         captureHistory();
         setEdges((eds) => eds.map((e) => {
           if (e.id === existingEdge.id) {
+            console.log("isDirty triggered by onConnect (existing edge modification)");
+            setIsDirty(true);
             return {
               ...e,
               data: {
@@ -356,10 +441,12 @@ export default function CenterCanvas() {
             relations: [{ sourceCol, targetCol }]
           },
         };
+        console.log("isDirty triggered by onConnect (new edge)");
+        setIsDirty(true);
         setEdges((eds) => addEdge(newEdge, eds));
       }
     },
-    [edges, setEdges, toast, captureHistory]
+    [edges, setEdges, toast, captureHistory, setIsDirty]
   );
 
   // Explicitly handle edge clicks for selection via shared context
@@ -388,13 +475,38 @@ export default function CenterCanvas() {
 
   const onAutoLayout = useCallback(() => {
     captureHistory();
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+
+    // Auto-resize nodes before layouting so they don't overlap
+    const resizedNodes = nodes.map(node => {
+      const data = node.data as any;
+      if (!data || !data.label) return node;
+
+      const numCols = data.columns?.length || 0;
+      const calcHeight = calcNodeHeight(numCols);
+
+      let maxColLen = 0;
+      if (data.columns && data.columns.length > 0) {
+        maxColLen = Math.max(...data.columns.map((c: any) => (c.name?.length || 0) + (c.type?.length || 0)));
+      }
+      const estimatedWidth = Math.max(260, (data.label.length || 0) * 9 + 100, maxColLen * 8 + 70);
+
+      return {
+        ...node,
+        style: { ...node.style, width: estimatedWidth, height: calcHeight },
+        measured: undefined // Clear cached measurement so layout uses the new style dimensions
+      };
+    });
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(resizedNodes as Node[], edges);
     setNodes([...layoutedNodes]);
     setEdges([...layoutedEdges]);
     window.requestAnimationFrame(() => {
       fitView({ padding: 0.3, duration: 800 });
     });
-  }, [nodes, edges, setNodes, setEdges, fitView, captureHistory]);
+
+    console.log("isDirty triggered by onAutoLayout");
+    setIsDirty(true);
+  }, [nodes, edges, setNodes, setEdges, fitView, captureHistory, setIsDirty]);
 
   // Default edge styling
   const defaultEdgeOptions = useMemo(
@@ -420,11 +532,11 @@ export default function CenterCanvas() {
 
       try {
         const data = JSON.parse(rawData);
-        
+
         // Find the columns from the metadata state
         const schema = metadataState.schemas.find(s => s.schema_name === data.schema);
         const table = schema?.tables?.find(t => t.table_name === data.table);
-        
+
         const hasColumns = table && table.columns && table.columns.length > 0;
 
         const position = screenToFlowPosition({
@@ -439,15 +551,23 @@ export default function CenterCanvas() {
         const numCols = table?.columns?.length || 0;
         const calcHeight = calcNodeHeight(numCols);
 
+        // Estimate width based on table name length and max column length to avoid truncation
+        let maxColLen = 0;
+        if (table?.columns && table.columns.length > 0) {
+          maxColLen = Math.max(...table.columns.map(c => (c.column_name?.length || 0) + (c.data_type?.length || 0)));
+        }
+        const estimatedWidth = Math.max(260, data.table.length * 9 + 100, maxColLen * 8 + 70);
+
         const newNode: Node = {
           id: `${data.schema}.${data.table}`,
           type: "tableNode",
           dragHandle: ".table-node-header",
           position,
-          style: { width: 240, height: calcHeight },
+          style: { width: estimatedWidth, height: calcHeight },
           data: {
             label: data.table,
             schema: data.schema,
+            catalog: data.catalog,
             accent: color,
             loading: !hasColumns,
             columns: (table && table.columns) ? table.columns.map(c => ({
@@ -469,20 +589,23 @@ export default function CenterCanvas() {
           return [...nds, newNode];
         });
 
-          // If columns are not loaded yet, trigger the API fetch
-          if (!hasColumns) {
-            toggleTable(data.schema, data.table).catch(err => {
-              console.error("Failed to fetch table columns on drop", err);
-              toast({ type: "error", message: `Failed to load columns for ${data.table}` });
-              // Optional: we could remove the loading node here, but letting it stay is fine
-            });
-          }
-        } catch (err) {
-          console.error("Drop error", err);
+        console.log("isDirty triggered by onDrop");
+        setIsDirty(true);
+
+        // If columns are not loaded yet, trigger the API fetch
+        if (!hasColumns) {
+          toggleTable(data.schema, data.table).catch(err => {
+            console.error("Failed to fetch table columns on drop", err);
+            toast({ type: "error", message: `Failed to load columns for ${data.table}` });
+            // Optional: we could remove the loading node here, but letting it stay is fine
+          });
         }
-      },
-      [screenToFlowPosition, metadataState.schemas, setNodes, toast, toggleTable, captureHistory]
-    );
+      } catch (err) {
+        console.error("Drop error", err);
+      }
+    },
+    [screenToFlowPosition, metadataState.schemas, setNodes, toast, toggleTable, captureHistory]
+  );
 
   return (
     <main

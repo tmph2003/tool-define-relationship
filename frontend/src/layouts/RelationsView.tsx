@@ -1,6 +1,7 @@
 import React from "react";
 import { type Edge, type Node } from "@xyflow/react";
 import type { TableNodeData } from "../components/TableNode";
+import { useProject } from "../store/ProjectContext";
 
 interface RelationsViewProps {
   nodes: Node[];
@@ -10,6 +11,7 @@ interface RelationsViewProps {
 }
 
 export default function RelationsView({ nodes, edges, setEdges, captureHistory }: RelationsViewProps) {
+  const { setIsDirty } = useProject();
   
   const getColumns = (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
@@ -26,11 +28,15 @@ export default function RelationsView({ nodes, edges, setEdges, captureHistory }
   const updateEdge = (edgeId: string, updates: Partial<Edge>) => {
     captureHistory();
     setEdges((eds) => eds.map((e) => (e.id === edgeId ? { ...e, ...updates } : e)));
+    console.log("isDirty triggered by RelationsView updateEdge");
+    setIsDirty(true);
   };
 
   const deleteEdge = (edgeId: string) => {
     captureHistory();
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    console.log("isDirty triggered by RelationsView deleteEdge");
+    setIsDirty(true);
   };
 
   return (

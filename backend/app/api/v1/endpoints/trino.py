@@ -40,7 +40,8 @@ async def trino_health() -> HealthResponse:
         trino_reachable=reachable,
         host=info["host"],
         catalog=info["catalog"],
-        schema_name=info["schema_name"]
+        schema_name=info["schema_name"],
+        user=info.get("user")
     )
 
 

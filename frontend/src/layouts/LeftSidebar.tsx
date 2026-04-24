@@ -269,6 +269,7 @@ export default function LeftSidebar() {
           <SchemaRow
             key={schema.schema_name}
             schema={schema}
+            catalog={state.catalog || ""}
             filter={search}
             onToggleSchema={toggleSchema}
             onToggleTable={toggleTable}

@@ -25,12 +25,14 @@ class ProjectCreate(BaseModel):
     connection_key: str
     data: Dict[str, Any]  # { nodes: [...] }
     column_groups: list[list[RelationMemberSchema]] = []
+    version: Optional[int] = None
 
 
 class ProjectUpdate(BaseModel):
     connection_key: str
     data: Dict[str, Any]
     column_groups: list[list[RelationMemberSchema]] = []
+    version: Optional[int] = None
 
 
 class ProjectResponse(BaseModel):
@@ -40,5 +42,17 @@ class ProjectResponse(BaseModel):
     column_groups: list[list[RelationMemberSchema]] = []
     created_at: datetime
     updated_at: datetime
+    version: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectHistoryResponse(BaseModel):
+    id: int
+    project_id: int
+    version: int
+    data: Dict[str, Any]
+    column_groups: list[list[RelationMemberSchema]] = []
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
