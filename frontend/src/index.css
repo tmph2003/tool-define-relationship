@@ -1,0 +1,367 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────
+   OBSIDIAN CARTOGRAPHER — Global Design System
+   ───────────────────────────────────────────────────────── */
+
+:root {
+  --nav-h: 48px;
+  --sidebar-w: 220px;
+  --panel-w: 280px;
+  --color-bg:          #0C0D0F;
+  --color-surface:     #18191C;
+  --color-surface-2:   #242529;
+  --color-border:      rgba(255, 255, 255, 0.06);
+  --color-border-mid:  rgba(255, 255, 255, 0.10);
+  --color-amber:       #F5A623;
+  --color-amber-muted: #C47E10;
+  --color-amber-dim:   rgba(245, 166, 35, 0.12);
+  --color-text-1:      #ECEDEF;
+  --color-text-2:      #9899A0;
+  --color-text-3:      #5C5D63;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-1);
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Always dark — no light mode toggle needed */
+}
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-mid); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-3); }
+
+/* ── Dot-grid canvas texture ───────────────────────────── */
+.dot-grid {
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.08) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
+/* ── Hairline borders ──────────────────────────────────── */
+.border-hairline { border-color: var(--color-border); }
+.border-hairline-mid { border-color: var(--color-border-mid); }
+
+/* ── Section header label (monospaced uppercase) ───────── */
+.section-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Amber accent line (sweep animation) ───────────────── */
+.amber-sweep {
+  position: relative;
+}
+.amber-sweep::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--color-amber);
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.amber-sweep:hover::after,
+.amber-sweep.active::after {
+  width: 100%;
+}
+
+/* ── Nav active indicator ──────────────────────────────── */
+.nav-active-dot::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-amber);
+  margin-right: 8px;
+  box-shadow: 0 0 6px var(--color-amber);
+  flex-shrink: 0;
+}
+
+/* ── Canvas node (placeholder for future graph nodes) ──── */
+.canvas-node {
+  position: absolute;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-mid);
+  border-radius: 6px;
+  padding: 12px 16px;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: "Space Grotesk", sans-serif;
+}
+.canvas-node:hover {
+  border-color: var(--color-amber-muted);
+  box-shadow: 0 0 0 1px var(--color-amber-muted), 0 0 20px rgba(245, 166, 35, 0.08);
+}
+.canvas-node.selected {
+  border-color: var(--color-amber);
+  box-shadow: 0 0 0 1px var(--color-amber), 0 0 28px rgba(245, 166, 35, 0.15);
+}
+
+/* ── Stagger animation delays for sidebar items ─────────── */
+.stagger-1 { animation-delay: 0.04s; }
+.stagger-2 { animation-delay: 0.08s; }
+.stagger-3 { animation-delay: 0.12s; }
+.stagger-4 { animation-delay: 0.16s; }
+.stagger-5 { animation-delay: 0.20s; }
+.stagger-6 { animation-delay: 0.24s; }
+
+/* ═══════════════════════════════════════════════════════════
+   REACT FLOW — Dark-mode overrides (Obsidian Cartographer)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Controls */
+.react-flow__controls {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border-mid) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+}
+.react-flow__controls-button {
+  background: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  fill: var(--color-text-2) !important;
+}
+.react-flow__controls-button:hover {
+  background: var(--color-surface-2) !important;
+  fill: var(--color-amber) !important;
+}
+
+/* Edge labels */
+.react-flow__edge-textbg {
+  fill: var(--color-surface) !important;
+  rx: 3;
+  ry: 3;
+}
+.react-flow__edge-text {
+  fill: var(--color-text-2) !important;
+  font-family: "JetBrains Mono", monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 0.06em;
+}
+
+/* Ensure edges are clickable — override React Flow v12's default pointer-events:none on the SVG container */
+.react-flow__edges,
+.react-flow__edges svg,
+.react-flow__edges > * {
+  pointer-events: all !important;
+}
+.react-flow__edge,
+.react-flow__edge-interaction {
+  pointer-events: all !important;
+  cursor: pointer;
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: rgba(245, 166, 35, 0.06) !important;
+  border: 1px solid rgba(245, 166, 35, 0.3) !important;
+}
+
+/* Connection line (while dragging) */
+.react-flow__connection-line path {
+  stroke: var(--color-amber) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE NODE — Obsidian Cartographer
+   ═══════════════════════════════════════════════════════════ */
+
+.table-node {
+  width: 100%;
+  height: 100%;
+  min-width: 220px;
+  min-height: 100px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-mid);
+  border-radius: 6px;
+  font-family: "Space Grotesk", sans-serif;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────── */
+.table-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--color-surface-2);
+}
+
+/* ── Column rows container ───────────────────── */
+.table-node-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar for table-node-body */
+.table-node-body::-webkit-scrollbar {
+  width: 4px;
+}
+.table-node-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-node-body::-webkit-scrollbar-thumb {
+  background: var(--color-border-mid);
+  border-radius: 2px;
+}
+.table-node-body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-3);
+}
+
+/* ── Single column row ───────────────────────── */
+.table-node-col {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.1s;
+}
+.table-node-col:last-child {
+  border-bottom: none;
+}
+.table-node-col:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── PK / FK badge ───────────────────────────── */
+.table-node-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Column name ─────────────────────────────── */
+.table-node-colname {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--color-text-1);
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Column type ─────────────────────────────── */
+.table-node-coltype {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ── Footer ──────────────────────────────────── */
+.table-node-footer {
+  padding: 4px 12px;
+  border-top: 1px solid var(--color-border);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  color: var(--color-text-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Per-column handles ──────────────────────── */
+.table-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--color-surface-2) !important;
+  border: 1.5px solid var(--color-border-mid) !important;
+  border-radius: 50% !important;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+}
+/* Show handles on node hover or when connecting */
+.table-node:hover .table-handle,
+.table-node-col:hover .table-handle,
+.react-flow__handle-connecting {
+  opacity: 1;
+}
+.table-handle:hover {
+  border-color: var(--color-amber) !important;
+  background: var(--color-amber-dim) !important;
+  transform: scale(1.3);
+}
+.table-handle-left {
+  left: 2px !important;
+}
+.table-handle-left::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  left: -5px;
+  width: 100px;
+  z-index: -1;
+  cursor: crosshair;
+}
+.table-handle-right {
+  right: 2px !important;
+}
+.table-handle-right::after {
+  content: "";
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  right: -5px;
+  width: 100px;
+  z-index: -1;
+  cursor: crosshair;
+}
+/* Handle while actively connecting */
+.react-flow__handle-valid {
+  border-color: var(--color-amber) !important;
+  background: rgba(245, 166, 35, 0.3) !important;
+}
+
+/* ── Skeleton shimmer ───────────────────────────────────── */
+@keyframes pulse-skeleton {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+/* ── Spin ───────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Connection dot pulse ───────────────────────────────── */
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--color-amber); }
+  50%       { opacity: 0.5; box-shadow: 0 0 2px var(--color-amber); }
+}

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: relationship-designer
+description: A Helm chart for Relationship Designer — visual database relationship tool
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - relationship-designer
+  - fastapi
+  - react
+  - trino
+  - database
+maintainers:
+  - name: tmph2003
+    url: https://github.com/tmph2003
+home: https://github.com/tmph2003/tool-define-relationship
+sources:
+  - https://github.com/tmph2003/tool-define-relationship

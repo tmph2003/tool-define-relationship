@@ -1,0 +1,39 @@
+============================================================
+  🚀 Relationship Designer has been deployed!
+============================================================
+
+Release:   {{ .Release.Name }}
+Namespace: {{ include "rd.namespace" . }}
+Version:   {{ .Chart.AppVersion }}
+
+------------------------------------------------------------
+📋 Check pod status:
+------------------------------------------------------------
+
+  kubectl -n {{ include "rd.namespace" . }} get pods
+
+------------------------------------------------------------
+🌐 Access the application:
+------------------------------------------------------------
+
+{{- if .Values.ingress.enabled }}
+  Application URL: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+  API Docs:        http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}/docs
+
+  Please configure your DNS to point the sub-domain '{{ .Values.ingress.host }}' to the Ingress Controller.
+{{- else }}
+  # Port-forward to access locally:
+  kubectl -n {{ include "rd.namespace" . }} port-forward svc/{{ include "rd.fullname" . }}-frontend 8080:{{ .Values.frontend.service.port }}
+  kubectl -n {{ include "rd.namespace" . }} port-forward svc/{{ include "rd.fullname" . }}-backend 8000:{{ .Values.backend.service.port }}
+
+  Frontend: http://localhost:8080
+  Backend:  http://localhost:8000/docs
+{{- end }}
+
+------------------------------------------------------------
+📊 View logs:
+------------------------------------------------------------
+
+  kubectl -n {{ include "rd.namespace" . }} logs -f deploy/{{ include "rd.fullname" . }}-backend
+
+============================================================

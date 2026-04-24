@@ -1,0 +1,32 @@
+# =============================================================================
+# ConfigMap — non-sensitive application configuration
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: relationship-designer
+  labels:
+    app.kubernetes.io/name: relationship-designer
+    app.kubernetes.io/part-of: relationship-designer
+data:
+  # General
+  APP_ENV: "production"
+  APP_NAME: "Relationship Designer"
+
+  # Backend
+  BACKEND_HOST: "0.0.0.0"
+  BACKEND_PORT: "8000"
+  BACKEND_LOG_LEVEL: "info"
+  BACKEND_CORS_ORIGINS: "http://localhost:5173,http://localhost:3000"
+  UVICORN_WORKERS: "2"
+
+  # Trino
+  TRINO_HOST: "localhost"
+  TRINO_PORT: "8080"
+  TRINO_USER: "trino"
+  TRINO_CATALOG: "hive"
+  TRINO_HTTP_SCHEME: "http"
+
+  # Database name (non-sensitive part)
+  POSTGRES_DB: "relationship_designer"

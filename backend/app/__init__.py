@@ -1,0 +1,1 @@
+"""Relationship Designer — FastAPI Application."""

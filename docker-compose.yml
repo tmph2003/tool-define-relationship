@@ -1,0 +1,122 @@
+version: "3.9"
+
+# =============================================================================
+# Relationship Designer — Docker Compose
+# =============================================================================
+# Services:
+#   frontend  — React + Vite dev server  (port 5173)
+#   backend   — FastAPI + Uvicorn        (port 8000)
+#   db        — PostgreSQL 16            (port 5432)  — app metadata
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Frontend — React + Vite
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Hot-reload: mount source but keep container's node_modules
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Backend — FastAPI
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Hot-reload: mount source for development (--reload picks up changes)
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      # Runtime mode — toggles --reload in the Dockerfile CMD
+      APP_ENV: ${APP_ENV:-development}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+
+      # Backend
+      BACKEND_HOST: "0.0.0.0"
+      BACKEND_PORT: "8000"
+      BACKEND_LOG_LEVEL: ${BACKEND_LOG_LEVEL:-info}
+
+      # Database
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/relationship_designer}
+
+      # Trino
+      TRINO_HOST: ${TRINO_HOST:-localhost}
+      TRINO_PORT: ${TRINO_PORT:-8080}
+      TRINO_USER: ${TRINO_USER:-trino}
+      TRINO_CATALOG: ${TRINO_CATALOG:-hive}
+      TRINO_HTTP_SCHEME: ${TRINO_HTTP_SCHEME:-http}
+
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - app-network
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Database — PostgreSQL (app metadata)
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-relationship_designer}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

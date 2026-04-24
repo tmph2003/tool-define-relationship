@@ -1,0 +1,43 @@
+# =============================================================================
+# Backend .dockerignore
+# Prevents unnecessary files from entering the build context
+# =============================================================================
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets — NEVER bake these into the image
+.env
+.env.*
+!.env.example
+
+# Dev tooling
+tests/
+.git/
+.gitignore
+*.md
+Makefile
+
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp

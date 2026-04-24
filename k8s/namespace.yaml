@@ -1,0 +1,10 @@
+# =============================================================================
+# Namespace — isolate all Relationship Designer resources
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: relationship-designer
+  labels:
+    app.kubernetes.io/name: relationship-designer
+    app.kubernetes.io/part-of: relationship-designer

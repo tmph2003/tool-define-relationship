@@ -1,0 +1,159 @@
+# =============================================================================
+# Relationship Designer — Helm Values
+# =============================================================================
+# Override these values per environment:
+#   helm install rd ./helm/relationship-designer -f values-prod.yaml
+# =============================================================================
+
+nameOverride: ""
+fullnameOverride: "relationship-designer"
+# ---------------------------------------------------------------------------
+# Image pull secrets for private registry (Harbor)
+# ---------------------------------------------------------------------------
+imagePullSecrets: []
+# - name: harbor-pull-secret
+
+# ---------------------------------------------------------------------------
+# Tolerations — required to schedule on tainted worker nodes
+# ---------------------------------------------------------------------------
+tolerations:
+  - key: "workload.sunhouse.com/class"
+    operator: "Equal"
+    value: "dataplatform"
+    effect: "NoSchedule"
+
+# ---------------------------------------------------------------------------
+# Frontend — Nginx serving React SPA
+# ---------------------------------------------------------------------------
+frontend:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    registry: harbor.sunhouse.com.vn
+    repository: shg-dev-dp/rd-frontend
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: NodePort
+    port: 80
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+  probes:
+    liveness:
+      path: /nginx-health
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      path: /nginx-health
+      initialDelaySeconds: 3
+      periodSeconds: 5
+
+# ---------------------------------------------------------------------------
+# Backend — FastAPI + Uvicorn
+# ---------------------------------------------------------------------------
+backend:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    registry: harbor.sunhouse.com.vn
+    repository: shg-dev-dp/rd-backend
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+  # Application config
+  config:
+    APP_ENV: production
+    APP_NAME: "Relationship Designer"
+    BACKEND_HOST: "0.0.0.0"
+    BACKEND_PORT: "8000"
+    BACKEND_LOG_LEVEL: info
+    BACKEND_CORS_ORIGINS: "http://localhost:5173,http://localhost:3000"
+    UVICORN_WORKERS: "1"
+
+
+  # Sensitive config — override in production!
+  secrets:
+    SECRET_KEY: "change-me-to-a-random-secret-in-production"
+
+# ---------------------------------------------------------------------------
+# PostgreSQL
+# ---------------------------------------------------------------------------
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+
+  auth:
+    username: postgres
+    password: postgres
+    database: relationship_designer
+
+  service:
+    type: NodePort
+    port: 5432
+    nodePort: 31432
+
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""  # Use default StorageClass; set to "gp3", "standard", etc.
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  host: relationship-designer.local
+
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+  tls: []
+  # - secretName: relationship-designer-tls
+  #   hosts:
+  #     - relationship-designer.example.com

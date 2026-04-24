@@ -1,0 +1,69 @@
+# =============================================================================
+# Ingress — route external traffic to frontend & backend
+# =============================================================================
+# Prerequisites:
+#   - Nginx Ingress Controller installed in the cluster
+#     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/cloud/deploy.yaml
+#
+# For TLS, install cert-manager and add:
+#   tls:
+#     - hosts: [your-domain.com]
+#       secretName: relationship-designer-tls
+#   annotations:
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: relationship-designer
+  namespace: relationship-designer
+  labels:
+    app.kubernetes.io/name: relationship-designer
+    app.kubernetes.io/part-of: relationship-designer
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: relationship-designer.local
+      http:
+        paths:
+          # API & docs → backend
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          # Everything else → frontend (SPA)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

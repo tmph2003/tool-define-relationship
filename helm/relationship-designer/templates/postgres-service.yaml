@@ -1,0 +1,25 @@
+{{- if .Values.postgresql.enabled }}
+# =============================================================================
+# PostgreSQL — Headless Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rd.fullname" . }}-db
+  namespace: {{ include "rd.namespace" . }}
+  labels:
+    {{- include "rd.labels" . | nindent 4 }}
+    {{- include "rd.selectorLabels" (dict "root" . "component" "database") | nindent 4 }}
+spec:
+  type: {{ .Values.postgresql.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "rd.selectorLabels" (dict "root" . "component" "database") | nindent 4 }}
+  ports:
+    - port: {{ .Values.postgresql.service.port }}
+      targetPort: {{ .Values.postgresql.service.port }}
+      protocol: TCP
+      name: postgres
+      {{- if and (eq (.Values.postgresql.service.type | default "ClusterIP") "NodePort") .Values.postgresql.service.nodePort }}
+      nodePort: {{ .Values.postgresql.service.nodePort }}
+      {{- end }}
+{{- end }}

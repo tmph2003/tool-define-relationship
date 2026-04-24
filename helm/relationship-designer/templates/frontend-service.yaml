@@ -1,0 +1,22 @@
+{{- if .Values.frontend.enabled }}
+# =============================================================================
+# Frontend — Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rd.fullname" . }}-frontend
+  namespace: {{ include "rd.namespace" . }}
+  labels:
+    {{- include "rd.labels" . | nindent 4 }}
+    {{- include "rd.selectorLabels" (dict "root" . "component" "web") | nindent 4 }}
+spec:
+  type: {{ .Values.frontend.service.type }}
+  selector:
+    {{- include "rd.selectorLabels" (dict "root" . "component" "web") | nindent 4 }}
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.port }}
+      protocol: TCP
+      name: http
+{{- end }}

@@ -1,0 +1,71 @@
+{{- if .Values.ingress.enabled }}
+# =============================================================================
+# Ingress — route external traffic to frontend & backend
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "rd.fullname" . }}
+  namespace: {{ include "rd.namespace" . }}
+  labels:
+    {{- include "rd.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - secretName: {{ .secretName }}
+      hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          # API & docs → backend
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "rd.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "rd.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "rd.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "rd.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+          # Everything else → frontend (SPA)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "rd.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}

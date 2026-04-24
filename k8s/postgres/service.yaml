@@ -1,0 +1,24 @@
+# =============================================================================
+# PostgreSQL — Headless Service
+# =============================================================================
+# Headless service (clusterIP: None) for StatefulSet DNS resolution.
+# Backend connects via: db.relationship-designer.svc.cluster.local:5432
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: relationship-designer
+  labels:
+    app.kubernetes.io/name: db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: relationship-designer
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: db
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
