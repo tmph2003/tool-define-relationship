@@ -2,8 +2,8 @@
  * TableNode — Custom React Flow node that renders a database table.
  * Each column gets its own left + right Handle for column-level connections.
  */
-import { memo } from "react";
-import { Handle, Position, NodeResizeControl, type NodeProps } from "@xyflow/react";
+import { memo, useRef, useCallback } from "react";
+import { Handle, Position, NodeResizeControl, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,9 +65,19 @@ function ResizeIcon({ color }: { color: string }) {
   );
 }
 
-function TableNodeInner({ data, selected }: NodeProps) {
+function TableNodeInner({ id, data, selected }: NodeProps) {
   const { label, schema, catalog, columns, accent } = data as unknown as TableNodeData;
   const accentColor = accent ?? "var(--color-amber)";
+
+  // Recalculate handle positions when the column list is scrolled
+  const updateNodeInternals = useUpdateNodeInternals();
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const handleBodyScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      updateNodeInternals(id);
+    }, 50);
+  }, [id, updateNodeInternals]);
 
   return (
     <>
@@ -140,7 +150,7 @@ function TableNodeInner({ data, selected }: NodeProps) {
       </div>
 
       {/* ── Column rows ─────────────────────────────────────────── */}
-      <div className="table-node-body nowheel">
+      <div className="table-node-body nowheel" onScroll={handleBodyScroll}>
         {(data as any).loading ? (
           <div style={{ padding: "12px", display: "flex", justifyContent: "center", alignItems: "center" }}>
             <span

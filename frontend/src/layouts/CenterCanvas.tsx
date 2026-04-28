@@ -240,6 +240,71 @@ export default function CenterCanvas() {
         }
         setIsDirty(false);
 
+        // ── Re-fetch columns from Trino to detect schema changes ───────
+        // Saved nodes may have stale column data. Re-fetch from Trino and
+        // update any node whose columns have changed.
+        if (savedNodes && savedNodes.length > 0) {
+          const refreshPromises = savedNodes
+            .filter((n: any) => n.type === "tableNode" && n.data?.schema && n.data?.label && !n.data?.loading)
+            .map((n: any) => {
+              const schemaName = n.data.schema as string;
+              const tableName = n.data.label as string;
+              return fetchColumns(schemaName, tableName)
+                .then((res) => ({ nodeId: n.id, columns: res.columns }))
+                .catch((err) => {
+                  console.warn(`Schema refresh: failed to fetch columns for ${schemaName}.${tableName}`, err);
+                  return null;
+                });
+            });
+
+          Promise.all(refreshPromises).then((results) => {
+            if (!mounted) return;
+            const validResults = results.filter((r): r is { nodeId: string; columns: any[] } => r !== null);
+            if (validResults.length === 0) return;
+
+            setNodes((nds) => {
+              let anyChanged = false;
+              const nextNodes = nds.map((node) => {
+                const result = validResults.find((r) => r.nodeId === node.id);
+                if (!result) return node;
+
+                const freshCols = result.columns.map((c) => ({
+                  name: c.column_name,
+                  type: c.data_type,
+                }));
+                const savedCols = (node.data as any).columns || [];
+
+                // Compare: check if columns differ (count, names, or types)
+                const colsMatch =
+                  savedCols.length === freshCols.length &&
+                  savedCols.every((sc: any, i: number) =>
+                    sc.name === freshCols[i].name && sc.type === freshCols[i].type
+                  );
+
+                if (colsMatch) return node;
+
+                anyChanged = true;
+                console.log(`Schema refresh: updating columns for ${node.id} (${savedCols.length} → ${freshCols.length} columns)`);
+                return {
+                  ...node,
+                  style: { ...node.style, height: calcNodeHeight(freshCols.length) },
+                  data: {
+                    ...node.data,
+                    loading: false,
+                    columns: freshCols,
+                  },
+                };
+              });
+
+              if (anyChanged) {
+                // Mark dirty so user knows the graph has schema updates to save
+                setIsDirty(true);
+              }
+              return anyChanged ? nextNodes : nds;
+            });
+          });
+        }
+
         // Allow saves after load is complete (small timeout to let state flush)
         setTimeout(() => {
           if (mounted) {
