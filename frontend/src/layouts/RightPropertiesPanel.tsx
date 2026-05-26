@@ -410,15 +410,70 @@ export default function RightPropertiesPanel() {
         <div className="flex flex-col gap-2 p-3 pb-4">
           <span className="section-label flex justify-between items-center" style={{ fontSize: 9, color: "var(--color-text-3)" }}>
             <span>COLUMNS MAPPING</span>
-            <button
-              onClick={() => {
-                const relations = (data.relations as any[]) || [];
-                updateEdgeData("relations", [...relations, { sourceCol: "", targetCol: "" }]);
-              }}
-              className="text-amber-500 hover:text-amber-400 font-bold px-1"
-            >
-              + ADD
-            </button>
+            <span className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const sourceNode = getNode(selectedEdge.source);
+                  const targetNode = getNode(selectedEdge.target);
+                  if (!sourceNode || !targetNode) return;
+
+                  const sourceCols: { name: string }[] = (sourceNode.data as any).columns || [];
+                  const targetCols: { name: string }[] = (targetNode.data as any).columns || [];
+                  const existingRelations = (data.relations as any[]) || [];
+
+                  // Find matching column names (case-insensitive)
+                  const newRelations = [...existingRelations];
+                  let addedCount = 0;
+                  for (const sc of sourceCols) {
+                    const match = targetCols.find(
+                      (tc) => tc.name.toLowerCase() === sc.name.toLowerCase()
+                    );
+                    if (!match) continue;
+                    // Skip if already mapped
+                    const alreadyExists = newRelations.some(
+                      (r) =>
+                        r.sourceCol.toLowerCase() === sc.name.toLowerCase() &&
+                        r.targetCol.toLowerCase() === match.name.toLowerCase()
+                    );
+                    if (alreadyExists) continue;
+                    newRelations.push({ sourceCol: sc.name, targetCol: match.name });
+                    addedCount++;
+                  }
+
+                  if (addedCount > 0) {
+                    updateEdgeData("relations", newRelations);
+                  }
+                }}
+                title="Auto-match columns with the same name"
+                className="px-1.5 py-0.5 rounded-sm font-semibold transition-all duration-150"
+                style={{
+                  background: "rgba(78, 158, 255, 0.1)",
+                  color: "#4E9EFF",
+                  border: "1px solid rgba(78, 158, 255, 0.2)",
+                  fontSize: 9,
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(78, 158, 255, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(78, 158, 255, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(78, 158, 255, 0.1)";
+                  e.currentTarget.style.borderColor = "rgba(78, 158, 255, 0.2)";
+                }}
+              >
+                ⚡ AUTO
+              </button>
+              <button
+                onClick={() => {
+                  const relations = (data.relations as any[]) || [];
+                  updateEdgeData("relations", [...relations, { sourceCol: "", targetCol: "" }]);
+                }}
+                className="text-amber-500 hover:text-amber-400 font-bold px-1"
+              >
+                + ADD
+              </button>
+            </span>
           </span>
           <div className="flex flex-col gap-2">
             {((data.relations as any[]) || []).map((rel, idx) => (
