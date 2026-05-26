@@ -198,11 +198,12 @@ export default function CenterCanvas() {
   }, [nodes, edges, setNodes, setEdges, toast, captureHistory, undoHistory]);
 
   const storageKey = useMemo(() => {
-    if (metadataState.connectedUser) {
-      return `rd_graph_user_${metadataState.connectedUser}`;
+    if (metadataState.catalog) {
+      const schemaPart = metadataState.primarySchema ? `_schema_${metadataState.primarySchema}` : "";
+      return `rd_graph_catalog_${metadataState.catalog}${schemaPart}`;
     }
     return null;
-  }, [metadataState.connectedUser]);
+  }, [metadataState.catalog, metadataState.primarySchema]);
 
   // Load from backend on connection
   useEffect(() => {
@@ -243,13 +244,17 @@ export default function CenterCanvas() {
         // ── Re-fetch columns from Trino to detect schema changes ───────
         // Saved nodes may have stale column data. Re-fetch from Trino and
         // update any node whose columns have changed.
+        // NOTE: This is an automatic process — do NOT set isDirty here.
+        // The columns are updated silently; the user will see fresh data
+        // without a false "unsaved changes" indicator.
         if (savedNodes && savedNodes.length > 0) {
           const refreshPromises = savedNodes
             .filter((n: any) => n.type === "tableNode" && n.data?.schema && n.data?.label && !n.data?.loading)
             .map((n: any) => {
               const schemaName = n.data.schema as string;
               const tableName = n.data.label as string;
-              return fetchColumns(schemaName, tableName)
+              const catalogName = (n.data.catalog as string) || undefined;
+              return fetchColumns(schemaName, tableName, catalogName)
                 .then((res) => ({ nodeId: n.id, columns: res.columns }))
                 .catch((err) => {
                   console.warn(`Schema refresh: failed to fetch columns for ${schemaName}.${tableName}`, err);
@@ -260,7 +265,12 @@ export default function CenterCanvas() {
           Promise.all(refreshPromises).then((results) => {
             if (!mounted) return;
             const validResults = results.filter((r): r is { nodeId: string; columns: any[] } => r !== null);
-            if (validResults.length === 0) return;
+            if (validResults.length === 0) {
+              // No column data fetched — just finish loading
+              isLoadingRef.current = false;
+              setIsProjectLoading(false);
+              return;
+            }
 
             setNodes((nds) => {
               let anyChanged = false;
@@ -296,22 +306,23 @@ export default function CenterCanvas() {
                 };
               });
 
-              if (anyChanged) {
-                // Mark dirty so user knows the graph has schema updates to save
-                setIsDirty(true);
-              }
+              // Do NOT set isDirty — this is an automatic schema sync, not a user action
               return anyChanged ? nextNodes : nds;
             });
-          });
-        }
 
-        // Allow saves after load is complete (small timeout to let state flush)
-        setTimeout(() => {
-          if (mounted) {
+            // Finish loading after schema refresh completes
             isLoadingRef.current = false;
             setIsProjectLoading(false);
-          }
-        }, 100);
+          });
+        } else {
+          // No nodes to refresh — finish loading immediately
+          setTimeout(() => {
+            if (mounted) {
+              isLoadingRef.current = false;
+              setIsProjectLoading(false);
+            }
+          }, 100);
+        }
       });
     }
     return () => { mounted = false; };
@@ -332,7 +343,8 @@ export default function CenterCanvas() {
         const schemaName = n.data.schema as string;
         const tableName = n.data.label as string;
 
-        fetchColumns(schemaName, tableName)
+        const catalogName = (n.data.catalog as string) || undefined;
+        fetchColumns(schemaName, tableName, catalogName)
           .then((res) => {
             setNodes((nds) =>
               nds.map((node) => {
@@ -395,8 +407,11 @@ export default function CenterCanvas() {
   }, [metadataState.schemas, setNodes]);
 
   // Validate edges: remove relations that refer to non-existent columns (e.g. after DB refresh)
+  // NOTE: This is automatic cleanup — do NOT set isDirty here.
   useEffect(() => {
     if (nodes.length === 0 || edges.length === 0) return;
+    // Skip validation while loading from server
+    if (isLoadingRef.current) return;
 
     setEdges((eds) => {
       let changed = false;
@@ -433,13 +448,12 @@ export default function CenterCanvas() {
       });
 
       if (changed) {
-        console.log("isDirty triggered by edge validation (relations length mismatch or 0)");
-        setIsDirty(true);
+        console.log("Edge validation: cleaned up stale relations (auto — not marking dirty)");
         return nextEdges;
       }
       return eds;
     });
-  }, [nodes, setEdges, setIsDirty]);
+  }, [nodes, setEdges]);
 
   // When a user draws a new edge between column handles
   const onConnect = useCallback(
@@ -569,8 +583,7 @@ export default function CenterCanvas() {
       fitView({ padding: 0.3, duration: 800 });
     });
 
-    console.log("isDirty triggered by onAutoLayout");
-    setIsDirty(true);
+    // Layout changes are visual-only, do not mark as dirty
   }, [nodes, edges, setNodes, setEdges, fitView, captureHistory, setIsDirty]);
 
   // Default edge styling

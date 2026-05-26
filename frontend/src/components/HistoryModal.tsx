@@ -16,8 +16,9 @@ export default function HistoryModal({ open, onClose }: HistoryModalProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open && metadataState.connectionStatus === "connected" && metadataState.connectedUser) {
-      const storageKey = `rd_graph_user_${metadataState.connectedUser}`;
+    if (open && metadataState.connectionStatus === "connected" && metadataState.catalog) {
+      const schemaPart = metadataState.primarySchema ? `_schema_${metadataState.primarySchema}` : "";
+      const storageKey = `rd_graph_catalog_${metadataState.catalog}${schemaPart}`;
       setIsHistoryLoading(true);
       fetchProjectHistory(storageKey)
         .then((data) => setHistory(data))

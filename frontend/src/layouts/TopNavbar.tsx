@@ -29,8 +29,9 @@ export default function TopNavbar() {
   const { exportProject, loadProject, activeTab, setActiveTab, isDirty, saveProjectToServer } = useProject();
 
   const handleSaveToServer = async () => {
-    if (!metadataState.connectedUser) return;
-    const storageKey = `rd_graph_user_${metadataState.connectedUser}`;
+    if (!metadataState.catalog) return;
+    const schemaPart = metadataState.primarySchema ? `_schema_${metadataState.primarySchema}` : "";
+    const storageKey = `rd_graph_catalog_${metadataState.catalog}${schemaPart}`;
     try {
       await saveProjectToServer(storageKey);
       toast({ type: "success", message: "Saved successfully!" });
@@ -161,7 +162,7 @@ export default function TopNavbar() {
           {/* Save Button */}
           <button
             onClick={handleSaveToServer}
-            disabled={!isDirty || metadataState.connectionStatus !== "connected"}
+            disabled={!isDirty || !metadataState.catalog}
             title={!isDirty ? "No unsaved changes" : "Save changes to server"}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-medium transition-all duration-150"
             style={{
