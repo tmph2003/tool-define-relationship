@@ -67,6 +67,7 @@ async def connect_trino(body: TrinoConnectionRequest) -> TrinoConnectionResponse
         catalog=body.catalog,
         schema_name=body.schema_name,
         http_scheme=body.http_scheme,
+        verify=body.verify,
     )
 
 
@@ -84,6 +85,19 @@ async def disconnect_trino() -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# GET /catalogs — List catalogs
+# ---------------------------------------------------------------------------
+@router.get(
+    "/catalogs",
+    response_model=list[str],
+    summary="List catalogs",
+    description="List all available Trino catalogs.",
+)
+async def list_catalogs() -> list[str]:
+    return trino_service.get_catalogs()
+
+
+# ---------------------------------------------------------------------------
 # GET /schemas — List schemas
 # ---------------------------------------------------------------------------
 @router.get(
@@ -96,8 +110,12 @@ async def disconnect_trino() -> dict[str, str]:
     summary="List schemas",
     description="List all schemas in the currently connected Trino catalog.",
 )
-async def list_schemas() -> SchemasResponse:
-    return trino_service.get_schemas()
+async def list_schemas(
+    catalog: str | None = Query(
+        None, description="Catalog name (optional, defaults to connected catalog)"
+    )
+) -> SchemasResponse:
+    return trino_service.get_schemas(catalog)
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +138,11 @@ async def list_tables(
         description="Schema name to list tables from",
         examples=["public", "default"],
     ),
+    catalog: str | None = Query(
+        None, description="Catalog name (optional)"
+    ),
 ) -> TablesResponse:
-    return trino_service.get_tables(schema_name)
+    return trino_service.get_tables(schema_name, catalog)
 
 
 # ---------------------------------------------------------------------------
@@ -150,5 +171,8 @@ async def list_columns(
         description="Table name",
         examples=["users"],
     ),
+    catalog: str | None = Query(
+        None, description="Catalog name (optional)"
+    ),
 ) -> ColumnsResponse:
-    return trino_service.get_columns(schema_name, table_name)
+    return trino_service.get_columns(schema_name, table_name, catalog)

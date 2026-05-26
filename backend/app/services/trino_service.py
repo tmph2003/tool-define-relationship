@@ -45,6 +45,7 @@ class _TrinoParams:
     catalog: str = "hive"
     schema_name: str | None = None
     http_scheme: str = "http"
+    verify: bool = True
     connected: bool = False
 
 
@@ -72,6 +73,7 @@ def _get_connection() -> trino.dbapi.Connection:
             auth=auth,
             catalog=_params.catalog,
             http_scheme=_params.http_scheme,
+            verify=_params.verify,
             request_timeout=10.0, # Fail fast if unreachable
         )
     except Exception as exc:
@@ -108,6 +110,7 @@ def connect(
     password: str | None = None,
     schema_name: str | None = None,
     http_scheme: str = "http",
+    verify: bool = True,
 ) -> TrinoConnectionResponse:
     """Store connection params and verify connectivity with a lightweight query."""
     _params.host = host
@@ -117,6 +120,7 @@ def connect(
     _params.catalog = catalog
     _params.schema_name = schema_name
     _params.http_scheme = http_scheme
+    _params.verify = verify
     _params.connected = True  # optimistically set so _get_connection works
 
     # Verify with a no-op query
@@ -151,6 +155,7 @@ def disconnect() -> None:
     _params.catalog = "hive"
     _params.schema_name = None
     _params.http_scheme = "http"
+    _params.verify = True
     _params.connected = False
     logger.info("Disconnected from Trino")
 
@@ -187,29 +192,37 @@ def get_connection_info() -> dict[str, str | None]:
     return {"host": _params.host, "catalog": _params.catalog, "schema_name": _params.schema_name, "user": _params.user}
 
 
-def get_schemas() -> SchemasResponse:
-    """List all schemas in the current catalog."""
-    rows = _execute_query("SHOW SCHEMAS")
+def get_catalogs() -> list[str]:
+    """List all available catalogs."""
+    rows = _execute_query("SHOW CATALOGS")
+    return [row[0] for row in rows]
+
+
+def get_schemas(catalog: str | None = None) -> SchemasResponse:
+    """List all schemas in a catalog."""
+    target_catalog = catalog or _params.catalog
+    rows = _execute_query(f'SHOW SCHEMAS FROM "{target_catalog}"')
     schemas = [SchemaItem(schema_name=row[0]) for row in rows]
     return SchemasResponse(
-        catalog=_params.catalog,
+        catalog=target_catalog,
         schemas=schemas,
         count=len(schemas),
     )
 
 
-def get_tables(schema_name: str) -> TablesResponse:
+def get_tables(schema_name: str, catalog: str | None = None) -> TablesResponse:
     """List all tables in a given schema."""
+    target_catalog = catalog or _params.catalog
     tables = []
     try:
-        rows = _execute_query(f'SHOW TABLES FROM "{schema_name}"')
+        rows = _execute_query(f'SHOW TABLES FROM "{target_catalog}"."{schema_name}"')
         tables = [TableItem(table_name=row[0]) for row in rows]
         
         # Try to enrich with table types via information_schema
         try:
             type_rows = _execute_query(
                 "SELECT table_name, table_type "
-                "FROM information_schema.tables "
+                f'FROM "{target_catalog}".information_schema.tables '
                 f"WHERE table_schema = '{schema_name}'"
             )
             type_map = {r[0]: r[1] for r in type_rows}
@@ -225,7 +238,7 @@ def get_tables(schema_name: str) -> TablesResponse:
         try:
             fallback_rows = _execute_query(
                 "SELECT table_name, table_type "
-                "FROM information_schema.tables "
+                f'FROM "{target_catalog}".information_schema.tables '
                 f"WHERE table_schema = '{schema_name}'"
             )
             tables = [TableItem(table_name=row[0], table_type=row[1]) for row in fallback_rows]
@@ -234,18 +247,19 @@ def get_tables(schema_name: str) -> TablesResponse:
             raise exc # raise the original permission error if fallback also fails
 
     return TablesResponse(
-        catalog=_params.catalog,
+        catalog=target_catalog,
         schema_name=schema_name,
         tables=tables,
         count=len(tables),
     )
 
 
-def get_columns(schema_name: str, table_name: str) -> ColumnsResponse:
+def get_columns(schema_name: str, table_name: str, catalog: str | None = None) -> ColumnsResponse:
     """List all columns for a specific table."""
+    target_catalog = catalog or _params.catalog
     rows = _execute_query(
         "SELECT column_name, data_type, is_nullable, column_default, comment, ordinal_position "
-        "FROM information_schema.columns "
+        f'FROM "{target_catalog}".information_schema.columns '
         f"WHERE table_schema = '{schema_name}' AND table_name = '{table_name}' "
         "ORDER BY ordinal_position"
     )
@@ -263,7 +277,7 @@ def get_columns(schema_name: str, table_name: str) -> ColumnsResponse:
     ]
 
     return ColumnsResponse(
-        catalog=_params.catalog,
+        catalog=target_catalog,
         schema_name=schema_name,
         table_name=table_name,
         columns=columns,

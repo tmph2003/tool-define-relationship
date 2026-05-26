@@ -16,6 +16,7 @@ interface FormValues {
   catalog: string;
   schema: string;
   http_scheme: "http" | "https";
+  verify: boolean;
 }
 
 const DEFAULT: FormValues = {
@@ -26,6 +27,7 @@ const DEFAULT: FormValues = {
   catalog: "",
   schema: "",
   http_scheme: "https",
+  verify: true,
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -268,6 +270,7 @@ export default function TrinoConnectForm({
         catalog: trimmedCatalog,
         schema: form.schema.trim() || undefined,
         http_scheme: form.http_scheme,
+        verify: form.verify,
       });
       setResult(res);
       setStatus("success");
@@ -441,6 +444,22 @@ export default function TrinoConnectForm({
               placeholder="hive" mono required />
             <Field id="trino-schema" label="SCHEMA" value={form.schema} onChange={set("schema")}
               placeholder="default (optional)" mono />
+
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="trino-verify"
+                checked={form.verify}
+                onChange={(e) => setForm((prev) => ({ ...prev, verify: e.target.checked }))}
+                className="w-3.5 h-3.5 rounded-sm outline-none cursor-pointer"
+                style={{
+                  accentColor: "var(--color-amber)",
+                }}
+              />
+              <label htmlFor="trino-verify" className="text-xs cursor-pointer" style={{ color: "var(--color-text-2)", fontFamily: "Space Grotesk, sans-serif" }}>
+                Verify SSL Certificate
+              </label>
+            </div>
           </div>
 
           {/* Status */}

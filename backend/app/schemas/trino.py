@@ -22,6 +22,7 @@ class TrinoConnectionRequest(BaseModel):
     catalog: str = Field("hive", min_length=1)
     schema_name: str | None = Field(None, alias="schema", description="Default schema within the catalog")
     http_scheme: str = Field("http", pattern=r"^https?$")
+    verify: bool = Field(True, description="Verify SSL certificate for HTTPS connections")
 
     model_config = {"populate_by_name": True}
 
