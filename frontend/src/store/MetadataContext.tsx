@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { MetadataState, TrinoConnectionRequest, TrinoConnectionResponse } from "../types";
-import { connectTrino, disconnectTrino, fetchTables, fetchColumns, checkHealth } from "../services";
+import { connectTrino, disconnectTrino, fetchTables, fetchColumns, fetchCatalogs, checkHealth } from "../services";
 
 const initial: MetadataState = {
   connectionStatus: "idle",
@@ -12,6 +12,8 @@ const initial: MetadataState = {
   schemas: [],
   schemasLoading: false,
   schemasError: null,
+  catalogs: [],
+  activeTreeCatalog: null,
 };
 
 type MetadataContextType = {
@@ -21,6 +23,7 @@ type MetadataContextType = {
   toggleSchema: (schemaName: string) => Promise<void>;
   toggleTable: (schemaName: string, tableName: string) => Promise<void>;
   addSchema: (schemaName: string) => Promise<void>;
+  setActiveTreeCatalog: (catalog: string) => void;
 };
 
 const MetadataContext = createContext<MetadataContextType | null>(null);
@@ -85,6 +88,8 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
       const res = await connectTrino(params);
       if (!res.connected) throw new Error(res.message);
 
+      const catalogsRes = await fetchCatalogs();
+
       setState((s) => ({
         ...s,
         connectionStatus: "connected",
@@ -96,6 +101,8 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
         schemasError: null,
         // Start with an empty list of schemas. The user must add them manually.
         schemas: [],
+        catalogs: catalogsRes,
+        activeTreeCatalog: res.catalog,
       }));
 
       // Automatically add and load the schema if provided
@@ -155,8 +162,9 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
     const shouldLoad = !sc.expanded && sc.tables === null && !sc.tablesLoading;
     if (!shouldLoad) return;
 
+    const activeCat = state.activeTreeCatalog || state.catalog || undefined;
     try {
-      const res = await fetchTables(schemaName);
+      const res = await fetchTables(schemaName, activeCat);
       setState((s) => ({
         ...s,
         schemas: s.schemas.map((x) =>
@@ -215,8 +223,9 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
     const shouldLoad = tbl.columns === null && !tbl.columnsLoading;
     if (!shouldLoad) return;
 
+    const activeCat = state.activeTreeCatalog || state.catalog || undefined;
     try {
-      const res = await fetchColumns(schemaName, tableName);
+      const res = await fetchColumns(schemaName, tableName, activeCat);
       setState((s) => ({
         ...s,
         schemas: s.schemas.map((x) =>
@@ -292,8 +301,9 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
 
     // Otherwise, we just added it and set tablesLoading: true.
     // Fetch the tables right away!
+    const activeCat = state.activeTreeCatalog || state.catalog || undefined;
     try {
-      const res = await fetchTables(cleanName);
+      const res = await fetchTables(cleanName, activeCat);
       setState((s) => ({
         ...s,
         schemas: s.schemas.map((x) =>
@@ -324,8 +334,17 @@ export function MetadataProvider({ children }: { children: ReactNode }) {
     }
   }, [toggleSchema]);
 
+  const setActiveTreeCatalog = useCallback((catalog: string) => {
+    setState((s) => ({
+      ...s,
+      activeTreeCatalog: catalog,
+      schemas: [],
+      schemasLoading: false,
+    }));
+  }, []);
+
   return (
-    <MetadataContext.Provider value={{ state, connect, disconnect, toggleSchema, toggleTable, addSchema }}>
+    <MetadataContext.Provider value={{ state, connect, disconnect, toggleSchema, toggleTable, addSchema, setActiveTreeCatalog }}>
       {children}
     </MetadataContext.Provider>
   );

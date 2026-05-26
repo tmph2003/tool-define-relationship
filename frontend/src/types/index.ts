@@ -26,6 +26,7 @@ export interface TrinoConnectionRequest {
   http_scheme: "http" | "https";
   password?: string;
   schema?: string;
+  verify?: boolean;
 }
 
 export interface TrinoConnectionResponse {
@@ -94,6 +95,8 @@ export interface MetadataState {
   schemas: SchemaNode[];
   schemasLoading: boolean;
   schemasError: string | null;
+  catalogs: string[];
+  activeTreeCatalog: string | null;
 }
 
 // ── Project Save / Load Types ───────────────────────────────────────────────

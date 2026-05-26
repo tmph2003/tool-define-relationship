@@ -56,18 +56,27 @@ export async function disconnectTrino(): Promise<void> {
   return request<void>("/api/v1/trino/disconnect", { method: "POST" });
 }
 
-export async function fetchSchemas(): Promise<SchemasResponse> {
-  return request<SchemasResponse>("/api/v1/trino/schemas");
+export async function fetchCatalogs(): Promise<string[]> {
+  return request<string[]>("/api/v1/trino/catalogs");
 }
 
-export async function fetchTables(schema: string): Promise<TablesResponse> {
-  return request<TablesResponse>(`/api/v1/trino/tables?schema=${encodeURIComponent(schema)}`);
+export async function fetchSchemas(catalog?: string): Promise<SchemasResponse> {
+  const url = catalog ? `/api/v1/trino/schemas?catalog=${encodeURIComponent(catalog)}` : "/api/v1/trino/schemas";
+  return request<SchemasResponse>(url);
 }
 
-export async function fetchColumns(schema: string, table: string): Promise<ColumnsResponse> {
-  return request<ColumnsResponse>(
-    `/api/v1/trino/columns?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`
-  );
+export async function fetchTables(schema: string, catalog?: string): Promise<TablesResponse> {
+  const url = catalog 
+    ? `/api/v1/trino/tables?schema=${encodeURIComponent(schema)}&catalog=${encodeURIComponent(catalog)}`
+    : `/api/v1/trino/tables?schema=${encodeURIComponent(schema)}`;
+  return request<TablesResponse>(url);
+}
+
+export async function fetchColumns(schema: string, table: string, catalog?: string): Promise<ColumnsResponse> {
+  const url = catalog
+    ? `/api/v1/trino/columns?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}&catalog=${encodeURIComponent(catalog)}`
+    : `/api/v1/trino/columns?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(table)}`;
+  return request<ColumnsResponse>(url);
 }
 
 export async function checkHealth(): Promise<{ status: string; trino_reachable: boolean; host?: string; catalog?: string }> {

@@ -4,7 +4,7 @@ import { SchemaRow } from "../components/MetadataTree";
 import { useProject } from "../store/ProjectContext";
 
 export default function LeftSidebar() {
-  const { state, toggleSchema, toggleTable, addSchema } = useMetadata();
+  const { state, toggleSchema, toggleTable, addSchema, setActiveTreeCatalog } = useMetadata();
   const { activeTab } = useProject();
   const [search, setSearch] = useState("");
   const [newSchema, setNewSchema] = useState("");
@@ -63,6 +63,32 @@ export default function LeftSidebar() {
         onMouseOver={(e) => e.currentTarget.style.background = "var(--color-amber-dim)"}
         onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
       />
+      {/* ── Catalog Selector ──────────────────────────────────────────── */}
+      {isConnected && state.catalogs && state.catalogs.length > 0 && (
+        <div style={{ padding: "10px 10px 0 10px", flexShrink: 0 }}>
+          <select
+            value={state.activeTreeCatalog || state.catalog || ""}
+            onChange={(e) => {
+              setActiveTreeCatalog(e.target.value);
+            }}
+            style={{
+              width: "100%",
+              background: "var(--color-surface-2)",
+              color: "var(--color-text-1)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "3px",
+              padding: "4px 8px",
+              fontSize: 11,
+              fontFamily: "JetBrains Mono, monospace",
+              outline: "none",
+            }}
+          >
+            {state.catalogs.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* ── Search ────────────────────────────────────────────────────── */}
       <div
         style={{
@@ -190,7 +216,7 @@ export default function LeftSidebar() {
         }}
       >
         <span className="section-label" style={{ flex: 1 }}>
-          {isConnected ? `${state.catalog} · schemas` : "metadata explorer"}
+          {isConnected ? `${state.activeTreeCatalog || state.catalog} · schemas` : "metadata explorer"}
         </span>
         {state.schemasLoading && (
           <span
@@ -269,7 +295,7 @@ export default function LeftSidebar() {
           <SchemaRow
             key={schema.schema_name}
             schema={schema}
-            catalog={state.catalog || ""}
+            catalog={state.activeTreeCatalog || state.catalog || ""}
             filter={search}
             onToggleSchema={toggleSchema}
             onToggleTable={toggleTable}
