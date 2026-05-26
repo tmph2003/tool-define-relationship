@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { type Edge, type Node } from "@xyflow/react";
 import type { TableNodeData } from "../components/TableNode";
 import { useProject } from "../store/ProjectContext";
@@ -12,6 +12,13 @@ interface RelationsViewProps {
 
 export default function RelationsView({ nodes, edges, setEdges, captureHistory }: RelationsViewProps) {
   const { setIsDirty } = useProject();
+
+  // State for creating new relationships
+  const [fromTable, setFromTable] = useState<string>("");
+  const [fromColumn, setFromColumn] = useState<string>("");
+  const [toTable, setToTable] = useState<string>("");
+  const [toColumn, setToColumn] = useState<string>("");
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   
   const getColumns = (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
@@ -39,6 +46,73 @@ export default function RelationsView({ nodes, edges, setEdges, captureHistory }
     setIsDirty(true);
   };
 
+  const handleAddRelationship = () => {
+    if (!fromTable || !toTable || !fromColumn || !toColumn) return;
+
+    captureHistory();
+
+    const isSourceFirst = fromTable < toTable;
+    const sourceId = isSourceFirst ? fromTable : toTable;
+    const targetId = isSourceFirst ? toTable : fromTable;
+    const sourceCol = isSourceFirst ? fromColumn : toColumn;
+    const targetCol = isSourceFirst ? toColumn : fromColumn;
+
+    const edgeId = `edge-${sourceId}-${targetId}`;
+
+    setEdges((currentEdges) => {
+      const existingEdgeIndex = currentEdges.findIndex((e) => e.id === edgeId);
+
+      if (existingEdgeIndex > -1) {
+        const existingEdge = currentEdges[existingEdgeIndex];
+        const relations = (existingEdge.data?.relations as any[]) || [];
+        
+        const relationExists = relations.some(
+          (r) => r.sourceCol === sourceCol && r.targetCol === targetCol
+        );
+
+        if (relationExists) {
+          return currentEdges;
+        }
+
+        const updatedRelations = [...relations, { sourceCol, targetCol }];
+        const updatedEdge = {
+          ...existingEdge,
+          data: {
+            ...existingEdge.data,
+            relations: updatedRelations
+          }
+        };
+
+        const newEdges = [...currentEdges];
+        newEdges[existingEdgeIndex] = updatedEdge;
+        return newEdges;
+      } else {
+        const newEdge: Edge = {
+          id: edgeId,
+          source: sourceId,
+          target: targetId,
+          sourceHandle: "table-source",
+          targetHandle: "table-target",
+          type: "relationshipEdge",
+          animated: false,
+          selected: false,
+          style: { stroke: "var(--color-amber)", strokeWidth: 1.5 },
+          data: {
+            relations: [{ sourceCol, targetCol }]
+          }
+        };
+
+        return [...currentEdges, newEdge];
+      }
+    });
+
+    setIsDirty(true);
+    
+    // Reset columns, keep tables for speed
+    setFromColumn("");
+    setToColumn("");
+  };
+
   return (
     <div
       className="absolute inset-0 z-10 p-8 overflow-y-auto"
@@ -47,6 +121,7 @@ export default function RelationsView({ nodes, edges, setEdges, captureHistory }
       }}
     >
       <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-white mb-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
@@ -56,11 +131,164 @@ export default function RelationsView({ nodes, edges, setEdges, captureHistory }
               Manage and customize all data relationships in the current graph.
             </p>
           </div>
-          <div className="px-4 py-2 rounded-md bg-amber-500/10 text-amber-500 font-mono text-sm border border-amber-500/20">
-            {edges.length} {edges.length === 1 ? "Relation" : "Relations"}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsFormOpen(!isFormOpen)}
+              className="px-4 py-2 text-xs font-semibold rounded-md border border-[var(--color-border-mid)] hover:bg-white/5 transition-all text-white flex items-center gap-1.5"
+            >
+              {isFormOpen ? "Hide Designer" : "Show Designer"}
+            </button>
+            <div className="px-4 py-2 rounded-md bg-amber-500/10 text-amber-500 font-mono text-sm border border-amber-500/20">
+              {edges.length} {edges.length === 1 ? "Relation" : "Relations"}
+            </div>
           </div>
         </div>
 
+        {/* Collapsible Power BI Style Relationship Designer */}
+        {isFormOpen && (
+          <div className="mb-8 p-6 rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/[0.03] via-amber-500/[0.01] to-transparent backdrop-blur-md shadow-xl relative overflow-hidden transition-all duration-300 hover:border-amber-500/30 animate-fadeIn">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.02] rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex items-center gap-2 mb-6">
+              <div className="p-1.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider font-space">
+                Add Relationship
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-9 gap-4 items-start">
+              {/* FROM Table Block */}
+              <div className="md:col-span-4 space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    Source Table (From)
+                  </label>
+                  <select
+                    value={fromTable}
+                    onChange={(e) => {
+                      setFromTable(e.target.value);
+                      setFromColumn("");
+                    }}
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border-mid)] rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                  >
+                    <option value="">Select source table...</option>
+                    {nodes.map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {getTableName(node.id)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {fromTable && (
+                  <div className="animate-fadeIn">
+                    <label className="block text-[10px] font-bold text-amber-500/80 uppercase tracking-widest mb-1.5">
+                      Source Column
+                    </label>
+                    <select
+                      value={fromColumn}
+                      onChange={(e) => setFromColumn(e.target.value)}
+                      className="w-full bg-[var(--color-bg)] border border-amber-500/30 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                    >
+                      <option value="">Select source column...</option>
+                      {getColumns(fromTable).map((col) => (
+                        <option key={col.name} value={col.name}>
+                          {col.name} ({col.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Arrow Connector */}
+              <div className="md:col-span-1 flex flex-col items-center justify-center self-center py-2">
+                <div className="p-2 rounded-full bg-white/5 border border-white/10 text-gray-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* TO Table Block */}
+              <div className="md:col-span-4 space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    Target Table (To)
+                  </label>
+                  <select
+                    value={toTable}
+                    onChange={(e) => {
+                      setToTable(e.target.value);
+                      setToColumn("");
+                    }}
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border-mid)] rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                  >
+                    <option value="">Select target table...</option>
+                    {nodes
+                      .filter((n) => n.id !== fromTable)
+                      .map((node) => (
+                        <option key={node.id} value={node.id}>
+                          {getTableName(node.id)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {toTable && (
+                  <div className="animate-fadeIn">
+                    <label className="block text-[10px] font-bold text-amber-500/80 uppercase tracking-widest mb-1.5">
+                      Target Column
+                    </label>
+                    <select
+                      value={toColumn}
+                      onChange={(e) => setToColumn(e.target.value)}
+                      className="w-full bg-[var(--color-bg)] border border-amber-500/30 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                    >
+                      <option value="">Select target column...</option>
+                      {getColumns(toTable).map((col) => (
+                        <option key={col.name} value={col.name}>
+                          {col.name} ({col.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Validation & Action Button */}
+            <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between gap-4 flex-wrap">
+              <div className="text-xs text-gray-400 font-mono">
+                {fromTable && toTable && fromColumn && toColumn ? (
+                  <span className="text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    Valid relationship: {getTableName(fromTable)}.{fromColumn} &rarr; {getTableName(toTable)}.{toColumn}
+                  </span>
+                ) : (
+                  "Select tables and matching fields to connect."
+                )}
+              </div>
+              <button
+                onClick={handleAddRelationship}
+                disabled={!fromTable || !toTable || !fromColumn || !toColumn}
+                className={`px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition-all ${
+                  fromTable && toTable && fromColumn && toColumn
+                    ? "bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/10 cursor-pointer active:scale-95"
+                    : "bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                Establish Relationship
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Relations Table */}
         <div className="rounded-lg overflow-hidden border border-[var(--color-border-mid)] bg-[var(--color-surface)] shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>

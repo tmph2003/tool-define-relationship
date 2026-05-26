@@ -49,6 +49,9 @@ class RelationMember(Base):
     schema: Mapped[str | None] = mapped_column(String(255), nullable=True)
     table_name: Mapped[str] = mapped_column(String(255), nullable=False)
     column_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), onupdate=datetime.utcnow
+    )
 
     # Relationships
     group: Mapped["RelationGroup"] = relationship(back_populates="members")
