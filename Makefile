@@ -3,10 +3,10 @@
 # =============================================================================
 
 # ⚠️ Replace with your actual image registry (e.g., docker.io/tmph2003)
-IMAGE_REGISTRY ?= IMAGE_REGISTRY
+IMAGE_REGISTRY ?= harbor.sunhouse.com.vn/shg-dev-dp
 IMAGE_TAG      ?= latest
-K8S_NAMESPACE   = relationship-designer
-HELM_RELEASE   ?= rd
+K8S_NAMESPACE   = shg-dev-dp-phuongtm1
+HELM_RELEASE   ?= relationship-desginer
 HELM_CHART      = ./helm/relationship-designer
 
 .PHONY: dev build down logs lint test clean \
